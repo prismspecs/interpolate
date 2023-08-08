@@ -17,7 +17,8 @@ from modules.shared import opts, cmd_opts, state
 import modules.images as images
 
 import re
-
+import base64
+import io
 
 # re_int = re.compile(r'([+-]?[0-9]*[.]?[0-9]+)[~]([+-]?[0-9]*[.]?[0-9]+)', flags=re.MULTILINE)
 re_int = re.compile(
@@ -30,6 +31,37 @@ re_range_count = re.compile(
     r"\s*([+-]?\s*\d+)\s*-\s*([+-]?\s*\d+)(?:\s*\[(\d+)\s*\])?\s*")
 re_range_count_float = re.compile(
     r"\s*([+-]?\s*\d+(?:.\d*)?)\s*-\s*([+-]?\s*\d+(?:.\d*)?)(?:\s*\[(\d+(?:.\d*)?)\s*\])?\s*")
+
+
+
+
+
+def data_url_to_pil_image(data_url):
+    # Step 1: Remove the data URL prefix and get the base64 encoded data
+    data_prefix = "data:image/png;base64,"
+    encoded_data = data_url[len(data_prefix):]
+
+    # Step 2: Add padding to the encoded data if needed
+    missing_padding = len(encoded_data) % 4
+    if missing_padding:
+        encoded_data += '=' * (4 - missing_padding)
+
+    # Step 3: Decode the base64 data to bytes
+    try:
+        decoded_data = base64.b64decode(encoded_data)
+    except binascii.Error as e:
+        print("Error decoding base64:", e)
+        return None  # Return None or handle the error as needed.
+
+    # Step 4: Create a PIL Image from the bytes data
+    try:
+        pil_image = Image.open(io.BytesIO(decoded_data))
+        return pil_image
+    except PIL.UnidentifiedImageError as e:
+        print("Error identifying image:", e)
+        return None  # Return None or handle the error as needed.
+    
+
 
 
 def apply_prompt_interpolate(p, x):
@@ -190,6 +222,14 @@ class Script(scripts.Script):
         return [init_img2, i_values, loopback_alpha, border_alpha, loopback_loops, blend_strides, loopback_toggle, reuse_seed, one_grid, interpolate_varseed, paste_on_mask, inpaint_all, interpolate_latent]
 
     def run(self, p, init_img2, i_values, loopback_alpha, border_alpha, loopback_loops, blend_strides, loopback_toggle, reuse_seed, one_grid, interpolate_varseed, paste_on_mask, inpaint_all, interpolate_latent):
+
+        # Print names, values, and types of input parameters
+        # parameters = locals()
+        # for name, value in parameters.items():
+        #     parameter_type = type(value).__name__
+        #     print(f"Parameter Name: {name}, Value: {value}, Type: {parameter_type}")
+
+
         processing.fix_seed(p)
         init_seed = p.seed
         tick_seed = init_seed + 1
@@ -221,6 +261,35 @@ class Script(scripts.Script):
 
         init_img = p.init_images[0]
         init_mask = None
+
+        
+
+
+
+
+
+
+        # fix stuff
+        init_img2 = data_url_to_pil_image(init_img2)
+        loopback_loops = int(loopback_loops)
+        one_grid = False
+        interpolate_varseed = False
+        paste_on_mask = False
+        inpaint_all = False
+        interpolate_latent = True #maybe
+        loopback_toggle = False
+        reuse_seed = False
+        loopback_alpha = 0.2
+        border_alpha = 0.1
+        blend_strides = 1
+
+
+
+
+
+
+
+
 
         paste_full_res = True
 
@@ -341,13 +410,14 @@ class Script(scripts.Script):
                 else:
                     res.append(processed.images[0])
 
-            if not one_grid:
-                grid = images.image_grid(res, rows=1)
-                if opts.grid_save:
-                    images.save_image(grid, p.outpath_grids, "grid", initial_seed, p.prompt, opts.grid_format,
-                                      info=info, short_filename=not opts.grid_extended_filename, grid=True, p=p)
+            # i dont want the grid image
+            # if not one_grid:
+            #     grid = images.image_grid(res, rows=1)
+            #     if opts.grid_save:
+            #         images.save_image(grid, p.outpath_grids, "grid", initial_seed, p.prompt, opts.grid_format,
+            #                           info=info, short_filename=not opts.grid_extended_filename, grid=True, p=p)
 
-                grids.append(grid)
+            #     grids.append(grid)
 
             return res
 
